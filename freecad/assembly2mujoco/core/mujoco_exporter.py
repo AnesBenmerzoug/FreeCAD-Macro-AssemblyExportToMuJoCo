@@ -4,15 +4,19 @@ from pathlib import Path
 from typing import Literal
 
 import FreeCAD as App
+import Mesh
 import MeshPart
 import UtilsAssembly
 
 from freecad.assembly2mujoco.constants import (
-    DEFAULT_ANGULAR_DEFLECTION,
-    DEFAULT_LINEAR_DEFLECTION,
+    DEFAULT_MESH_ANGULAR_DEFLECTION,
+    DEFAULT_MESH_LINEAR_DEFLECTION,
+    DEFAULT_MESH_EXPORT_FORMAT,
     DEFAULT_MJCF_INTEGRATOR,
     DEFAULT_MJCF_SOLVER,
     DEFAULT_MJCF_TIMESTEP,
+    DEFAULT_MJCF_ARMATURE,
+    DEFAULT_MJCF_DAMPING,
     WORKBENCH_NAME,
 )
 from freecad.assembly2mujoco.core.assembly_parser import (
@@ -40,19 +44,26 @@ class MuJoCoExporter:
 
     def __init__(
         self,
-        linear_deflection: float = DEFAULT_LINEAR_DEFLECTION,
-        angular_deflection: float = DEFAULT_ANGULAR_DEFLECTION,
+        *,
+        mesh_linear_deflection: float = DEFAULT_MESH_LINEAR_DEFLECTION,
+        mesh_angular_deflection: float = DEFAULT_MESH_ANGULAR_DEFLECTION,
+        mesh_export_format: Literal["STL", "OBJ"] = DEFAULT_MESH_EXPORT_FORMAT,
         integrator: Literal[
             "Euler", "implicit", "implicitfast", "RK4"
         ] = DEFAULT_MJCF_INTEGRATOR,
-        timestep: float = DEFAULT_MJCF_TIMESTEP,
         solver: Literal["PGS", "CG", "Newton"] = DEFAULT_MJCF_SOLVER,
+        timestep: float = DEFAULT_MJCF_TIMESTEP,
+        damping: float = DEFAULT_MJCF_DAMPING,
+        armature: float = DEFAULT_MJCF_ARMATURE,
     ) -> None:
-        self.linear_deflection = linear_deflection
-        self.angular_deflection = angular_deflection
+        self.mesh_linear_deflection = mesh_linear_deflection
+        self.mesh_angular_deflection = mesh_angular_deflection
+        self.mesh_export_format = mesh_export_format
         self.integrator = integrator
-        self.timestep = timestep
         self.solver = solver
+        self.timestep = timestep
+        self.damping = damping
+        self.armature = armature
 
         self.mujoco = ET.Element("mujoco")
         self.option = ET.SubElement(
@@ -75,8 +86,8 @@ class MuJoCoExporter:
         ET.SubElement(
             self.default,
             "joint",
-            damping="10.0",
-            armature="1.0",
+            damping=f"{self.damping}",
+            armature=f"{self.armature}",
         )
         ET.SubElement(
             self.default,
@@ -198,17 +209,25 @@ class MuJoCoExporter:
         for node in assembly_graph.get_nodes():
             part = node.part
             shape = part.Shape.copy(False)
+            mesh_file = Path(meshes_dir).joinpath(part.Name)
 
-            log_message(f"Shape: Name={part.Name}, Placement={shape.Placement}")
+            if self.mesh_export_format == "STL":
+                mesh = MeshPart.meshFromShape(
+                    Shape=shape,
+                    LinearDeflection=self.mesh_linear_deflection,
+                    AngularDeflection=self.mesh_angular_deflection,
+                    Relative=False,
+                )
+                mesh_file = mesh_file.with_suffix(".stl")
+                mesh.write(os.fspath(mesh_file))
+            elif self.mesh_export_format == "OBJ":
+                mesh_file = mesh_file.with_suffix(".obj")
+                Mesh.export([part], os.fspath(mesh_file))
+            else:
+                raise ValueError(
+                    f"{WORKBENCH_NAME}: Unexpected mesh export format '{self.mesh_export_format}'"
+                )
 
-            mesh = MeshPart.meshFromShape(
-                Shape=shape,
-                LinearDeflection=self.linear_deflection,
-                AngularDeflection=self.angular_deflection,
-                Relative=False,
-            )
-            mesh_file = Path(meshes_dir).joinpath(part.Name).with_suffix(".stl")
-            mesh.write(os.fspath(mesh_file))
             # Add new mesh to assets
             ET.SubElement(
                 self.asset,

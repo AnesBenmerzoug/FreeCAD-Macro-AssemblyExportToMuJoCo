@@ -54,8 +54,14 @@ class MuJoCoExportCommand(BaseCommand):
             try:
                 # Perform the export
                 exporter = MuJoCoExporter(
+                    mesh_linear_deflection=export_params["mesh_linear_deflection"],
+                    mesh_angular_deflection=export_params["mesh_angular_deflection"],
+                    mesh_export_format=export_params["mesh_export_format"],
                     integrator=export_params["mjcf_integrator"],
+                    solver=export_params["mjcf_solver"],
                     timestep=export_params["mjcf_timestep"],
+                    damping=export_params["mjcf_damping"],
+                    armature=export_params["mjcf_armature"],
                 )
                 output_path = export_params["export_dir"]
                 exporter.export_assembly(selected_obj, output_path)

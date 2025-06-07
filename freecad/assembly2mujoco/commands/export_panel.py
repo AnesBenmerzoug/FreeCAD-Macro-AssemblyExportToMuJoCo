@@ -7,8 +7,9 @@ import FreeCADGui as Gui
 from PySide import QtGui, QtWidgets
 
 from freecad.assembly2mujoco.constants import (
-    DEFAULT_ANGULAR_DEFLECTION,
-    DEFAULT_LINEAR_DEFLECTION,
+    DEFAULT_MESH_ANGULAR_DEFLECTION,
+    DEFAULT_MESH_LINEAR_DEFLECTION,
+    DEFAULT_MESH_EXPORT_FORMAT,
     DEFAULT_MJCF_ARMATURE,
     DEFAULT_MJCF_DAMPING,
     DEFAULT_MJCF_INTEGRATOR,
@@ -22,8 +23,9 @@ __all__ = ["ExportTaskPanel", "ExportParamsDict"]
 
 class ExportParamsDict(TypedDict):
     export_dir: Path
-    linear_deflection: float
-    angular_deflection: float
+    mesh_linear_deflection: float
+    mesh_angular_deflection: float
+    mesh_export_format: Literal["stl", "obj"]
     mjcf_timestep: float
     mjcf_damping: float
     mjcf_armature: float
@@ -52,7 +54,9 @@ class ExportTaskPanel:
         # Create main layout
         main_layout = QtWidgets.QVBoxLayout(self.form)
 
+        ###############################################
         # Directory selection section
+        ###############################################
         dir_group = QtWidgets.QGroupBox("Export Directory")
         dir_layout = QtWidgets.QHBoxLayout()
 
@@ -66,29 +70,42 @@ class ExportTaskPanel:
         dir_group.setLayout(dir_layout)
         main_layout.addWidget(dir_group)
 
-        # STL Export options
-        stl_group = QtWidgets.QGroupBox("STL Export Options")
-        stl_layout = QtWidgets.QFormLayout()
+        ###############################################
+        # Mesh Export options
+        ###############################################
+        mesh_group = QtWidgets.QGroupBox("Mesh Export Options")
+        mesh_layout = QtWidgets.QFormLayout()
 
         ## Mesh quality
-        self.linear_deflection_spin = QtWidgets.QDoubleSpinBox()
-        self.linear_deflection_spin.setRange(0.01, 1)
-        self.linear_deflection_spin.setSingleStep(0.01)
-        self.linear_deflection_spin.setDecimals(2)
-        self.linear_deflection_spin.setValue(DEFAULT_LINEAR_DEFLECTION)
-        stl_layout.addRow("Linear Deflection:", self.linear_deflection_spin)
+        self.mesh_linear_deflection_spin = QtWidgets.QDoubleSpinBox()
+        self.mesh_linear_deflection_spin.setRange(0.01, 1)
+        self.mesh_linear_deflection_spin.setSingleStep(0.01)
+        self.mesh_linear_deflection_spin.setDecimals(2)
+        self.mesh_linear_deflection_spin.setValue(DEFAULT_MESH_LINEAR_DEFLECTION)
+        mesh_layout.addRow("Linear Deflection:", self.mesh_linear_deflection_spin)
 
-        self.angular_deflection_spin = QtWidgets.QDoubleSpinBox()
-        self.angular_deflection_spin.setRange(0.5, 5.0)
-        self.angular_deflection_spin.setSingleStep(0.1)
-        self.angular_deflection_spin.setDecimals(1)
-        self.angular_deflection_spin.setValue(DEFAULT_ANGULAR_DEFLECTION)
-        stl_layout.addRow("Angular Deflection:", self.angular_deflection_spin)
+        self.mesh_angular_deflection_spin = QtWidgets.QDoubleSpinBox()
+        self.mesh_angular_deflection_spin.setRange(0.5, 5.0)
+        self.mesh_angular_deflection_spin.setSingleStep(0.1)
+        self.mesh_angular_deflection_spin.setDecimals(1)
+        self.mesh_angular_deflection_spin.setValue(DEFAULT_MESH_ANGULAR_DEFLECTION)
+        mesh_layout.addRow("Angular Deflection:", self.mesh_angular_deflection_spin)
 
-        stl_group.setLayout(stl_layout)
-        main_layout.addWidget(stl_group)
+        ### Mesh Format
+        self.mesh_export_format_combo = QtWidgets.QComboBox()
+        mesh_export_format_values = ["STL", "OBJ"]
+        mesh_export_format_values = [DEFAULT_MESH_EXPORT_FORMAT] + list(
+            set(mesh_export_format_values).difference([DEFAULT_MESH_EXPORT_FORMAT])
+        )
+        self.mesh_export_format_combo.addItems(mesh_export_format_values)
+        mesh_layout.addRow("Mesh Format:", self.mesh_export_format_combo)
 
+        mesh_group.setLayout(mesh_layout)
+        main_layout.addWidget(mesh_group)
+
+        ###############################################
         # MuJoCo MJCF parameters
+        ###############################################
         mjcf_group = QtWidgets.QGroupBox("MuJoCo MJCF Parameters")
         mjcf_layout = QtWidgets.QFormLayout()
 
@@ -169,8 +186,9 @@ class ExportTaskPanel:
         # Collect parameters
         export_params = {
             "export_dir": export_dir,
-            "linear_deflection": self.linear_deflection_spin.value(),
-            "angular_deflection": self.angular_deflection_spin.value(),
+            "mesh_linear_deflection": self.mesh_linear_deflection_spin.value(),
+            "mesh_angular_deflection": self.mesh_angular_deflection_spin.value(),
+            "mesh_export_format": self.mesh_export_format_combo.currentText(),
             "mjcf_timestep": self.timestep_spin.value(),
             "mjcf_damping": self.damping_spin.value(),
             "mjcf_armature": self.armature_spin.value(),
